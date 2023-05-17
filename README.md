@@ -1,8 +1,9 @@
 # meander
 
 Meander is an UCI chess engine and a spiritual successor to Rodent.
+Similarly to Rodent, it is based on Sungorus 1.4 by Pablo Vazquez.
 
-It is also a test bed for evaluation features, the most prominent being
+Meander is a test bed for evaluation features, the most prominent being
 
 - pawn x pawn evaluation table, replacing doubled, defended and phalanx
   pawn evaluation and adding some more relations between remote pawns
