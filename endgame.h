@@ -1,0 +1,11 @@
+bool JustKnight(Position* p, int c);
+bool JustBishop(Position* p, int c);
+bool JustRook(Position* p, int c);
+bool JustQueen(Position* p, int c);
+bool JustMinor(Position* p, int c);
+bool JustTwoMinors(Position* p, int c);
+bool BishopEndgame(Position* p);
+bool RookEndgame(Position* p);
+int ScaleKRPKR(Position* p, int sd, int op);
+bool DifferentBishops(Position* p);
+bool NotOnBishColor(Position* p, int bishSide, int s);
