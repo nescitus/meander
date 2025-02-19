@@ -1,4 +1,4 @@
-#include "meander.h"
+#include "rodent.h"
 #include "timer.h"
 #include <thread>
 
@@ -92,7 +92,7 @@ int Engine::Widen(Position* p, int depth, int* pv, int lastScore)
         {
             alpha = lastScore - margin;
             beta = lastScore + margin;
-            currentValue = Search(p, 0, alpha, beta, depth, 0, pv);
+            currentValue = Search(p, 0, alpha, beta, depth, false, 0, pv);
 
             if (abortSearch || abortThread)
                 break;
@@ -108,7 +108,7 @@ int Engine::Widen(Position* p, int depth, int* pv, int lastScore)
         }
     }
 
-    currentValue = Search(p, 0, -INF, INF, root_depth, 0, pv);      // full window search
+    currentValue = Search(p, 0, -INF, INF, root_depth, false, 0, pv);      // full window search
     return currentValue;
 }
 

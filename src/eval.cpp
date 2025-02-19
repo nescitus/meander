@@ -1,7 +1,7 @@
 #include <assert.h>
 #include <stdio.h>
 #include <math.h>
-#include "meander.h"
+#include "rodent.h"
 #include "eval.h"
 
 // TODO: 
@@ -287,29 +287,29 @@ void InitOptions(void)
         options[i] = 100;
     }
 
-    options[O_MATERIAL] = 100;
-    options[O_OWN_ATT] = 100;
-    options[O_OPP_ATT] = 100;
-    options[O_OWN_MOB] = 100;
-    options[O_OPP_MOB] = 100;
+    options[O_MATERIAL] = 105;
+    options[O_OWN_ATT] = 105;
+    options[O_OPP_ATT] = 105;
+    options[O_OWN_MOB] = 105;
+    options[O_OPP_MOB] = 105;
     options[O_OWN_TROP] = 21;
     options[O_OPP_TROP] = 21;
-    options[O_OWN_PRES] = 100;
-    options[O_OPP_PRES] = 100;
-    options[O_OWN_PAWN] = 100;
-    options[O_OPP_PAWN] = 100;
+    options[O_OWN_PRES] = 105;
+    options[O_OPP_PRES] = 105;
+    options[O_OWN_PAWN] = 95;
+    options[O_OPP_PAWN] = 95;
 }
 
 void InitWeights(void) {
 
-    for (int fc = 0; fc < N_OF_FACTORS; fc++) 
-    {
+    for (int fc = 0; fc < N_OF_FACTORS; fc++) {
         weights[White][fc] = 100;
         weights[Black][fc] = 100;
     }
 
     int oppoSide = progSide ^ 1;
 
+    /**
     weights[White][F_MAT] = options[O_MATERIAL];
     weights[Black][F_MAT] = options[O_MATERIAL];
 
@@ -329,8 +329,12 @@ void InitWeights(void) {
     weights[progSide][F_TROP] = options[O_OWN_TROP];
     weights[oppoSide][F_TROP] = options[O_OPP_TROP];
 
-    weights[progSide][F_OUTPOST] = 100;
-    weights[oppoSide][F_OUTPOST] = 100;
+    weights[progSide][F_OUTPOST] = 105;
+    weights[oppoSide][F_OUTPOST] = 105;
+    */
+
+    weights[progSide][F_TROP] = 21;
+    weights[oppoSide][F_TROP] = 21;
 }
 
 void EvaluatePieces(Position* p, EvalData* e, int sd) {
@@ -374,11 +378,18 @@ void EvaluatePieces(Position* p, EvalData* e, int sd) {
         if (bbSq & e->control[op][Pawn]) 
             Add(e, sd, F_PRES, -7, -2);
 
+        // Knight material value
+
         Add(e, sd, F_MAT, mg_value[Knight], eg_value[Knight]);
+
+        // Knight piece/square tables
+
         if (p->Map(sd, King) & Mask.ksCastle[sd])
             Add(e, sd, F_PST, Pst.mgKs[sd][Knight][sq], Pst.egOne[sd][Knight][sq]);
         else
             Add(e, sd, F_PST, Pst.mgOne[sd][Knight][sq], Pst.egOne[sd][Knight][sq]);
+
+        // Knight tropism to enemy king
 
         AddMg(e, sd, F_TROP, Dist.nTropismMg[sq][ksq]);
 
@@ -467,8 +478,16 @@ void EvaluatePieces(Position* p, EvalData* e, int sd) {
         if (bbSq & e->control[op][Pawn]) 
             Add(e, sd, F_PRES, -8, -6);
 
+        // Bishop material value
+
         Add(e, sd, F_MAT, mg_value[Bishop], eg_value[Bishop]);
+
+        // Bishop piece/square tables
+
         Add(e, sd, F_PST, Pst.mgOne[sd][Bishop][sq], Pst.egOne[sd][Bishop][sq]);
+
+        // Bishop tropism to the enemy king
+
         AddMg(e, sd, F_TROP, Dist.bTropismMg[sq][ksq]);
 
         // Bishop shielded by own pawn
@@ -574,8 +593,17 @@ void EvaluatePieces(Position* p, EvalData* e, int sd) {
     bbPieces = p->Map(sd, Rook);
     while (bbPieces) {
         sq = PopFirstBit(&bbPieces);
+
+        // Rook material value
+
         Add(e, sd, F_MAT, mg_value[Rook], eg_value[Rook]);
+
+        // Rook piece/square table
+
         Add(e, sd, F_PST, Pst.mgOne[sd][Rook][sq], Pst.egOne[sd][Rook][sq]);
+
+        // Rook tropism to the enemy king
+
         AddMg(e, sd, F_TROP, Dist.rTropismMg[sq][ksq]);
 
         // Rook mobility
@@ -610,7 +638,7 @@ void EvaluatePieces(Position* p, EvalData* e, int sd) {
             e->att[sd] += unsafeRookAttack * PopCnt(bbAtt & e->control[op][Pawn]);
         }
 
-        // Rook's file
+        // Rook on (half) open file
 
         bbFile = FillNorth(Paint(sq)) | FillSouth(Paint(sq));
 
@@ -661,8 +689,17 @@ void EvaluatePieces(Position* p, EvalData* e, int sd) {
     while (bbPieces) {
         sq = PopFirstBit(&bbPieces);
         bbSq = Paint(sq);
+
+        // Queen material value
+
         Add(e, sd, F_MAT, mg_value[Queen], eg_value[Queen]);
+
+        // Queen piece/square table
+
         Add(e, sd, F_PST, Pst.mgOne[sd][Queen][sq], Pst.egOne[sd][Queen][sq]);
+
+        // Queen tropism to the enemy king
+
         AddMg(e, sd, F_TROP, Dist.qTropismMg[sq][ksq]);
 
         // Premature queen developement
@@ -755,10 +792,10 @@ void Engine::PawnKingEval(Position* p, EvalData* e) {
 
     // f4/f5
 
-    const int c2malus = 0;
-    const int f4bonus = 21;
-    const int f2malus = 0;
-    const int botwinnik_bonus = 0;
+    const int c2malus = -7;
+    const int f4bonus = 20;
+    const int f2malus = -2;
+    const int botwinnik_bonus = 3;
     const int tension_bonus = 3;
 
     if (p->Map(White, King) & Mask.ksCastle[White] &&
@@ -770,37 +807,37 @@ void Engine::PawnKingEval(Position* p, EvalData* e) {
         }
 
         if (p->PawnComplex(White, D3, E4)) {
-            //if (p->IsOnSq(White, Pawn, F2))
-            //    AddMg(e, White, F_PAWNS, f2malus);
+            if (p->IsOnSq(White, Pawn, F2))
+                AddMg(e, White, F_PAWNS, f2malus);
             if (p->IsOnSq(White, Pawn, F4))
             AddMg(e, White, F_PAWNS, f4bonus);
-            //if (p->IsOnSq(White, Pawn, C4))
-            //    AddMg(e, White, F_PAWNS, botwinnik_bonus);
+            if (p->IsOnSq(White, Pawn, C4))
+                AddMg(e, White, F_PAWNS, botwinnik_bonus);
         }
 
         if (p->PawnComplex(Black, D6, E5)) {
-            //if (p->IsOnSq(Black, Pawn, F7))
-            //    AddMg(e, Black, F_PAWNS, f2malus);
+            if (p->IsOnSq(Black, Pawn, F7))
+                AddMg(e, Black, F_PAWNS, f2malus);
             if (p->IsOnSq(Black, Pawn, F5))
             AddMg(e, Black, F_PAWNS, f4bonus);
-            //if (p->IsOnSq(Black, Pawn, C5))
-            //    AddMg(e, Black, F_PAWNS, botwinnik_bonus);
+            if (p->IsOnSq(Black, Pawn, C5))
+                AddMg(e, Black, F_PAWNS, botwinnik_bonus);
         }
 
-        //if (p->PawnComplex(White, E3, D4)) {
-        //    if (p->IsOnSq(White, Pawn, C2))
-        //        AddMg(e, White, F_PAWNS, c2malus);
-        //}
+        if (p->PawnComplex(White, E3, D4)) {
+            if (p->IsOnSq(White, Pawn, C2))
+                AddMg(e, White, F_PAWNS, c2malus);
+        }
 
         if (p->PawnComplex(Black, C5, D5)) {
             if (p->IsOnSq(White, Pawn, D4))
                 AddMg(e, Black, F_PAWNS, tension_bonus);
         }
 
-        //if (p->PawnComplex(Black, E6, D5)) {
-        //    if (p->IsOnSq(Black, Pawn, C7))
-        //        AddMg(e, Black, F_PAWNS, c2malus);
-        //}
+        if (p->PawnComplex(Black, E6, D5)) {
+            if (p->IsOnSq(Black, Pawn, C7))
+                AddMg(e, Black, F_PAWNS, c2malus);
+        }
 
     }
 
@@ -928,6 +965,16 @@ void EvaluatePawns(Position* p, EvalData* e, int sd) {
         isUnopposed = ((frontSpan & p->Map(op, Pawn)) == 0);
         isPhalanx = (p->Map(sd, Pawn) & SidesOf(Paint(sq))) != 0;
         isDefended = ((Paint(sq) & e->control[sd][Pawn]) != 0);
+
+        //if (isPhalanx)
+        //    Add(e, sd, F_PAWNS, Pst.mgPhalanx[sd][sq], Pst.egPhalanx[sd][sq]);
+        //if (isDefended)
+        //    Add(e, sd, F_PAWNS, Pst.mgDefended[sd][sq], Pst.egPhalanx[sd][sq]);
+
+        // Doubled pawn
+
+       // if (frontSpan & p->Map(sd, Pawn))
+       //     Add(e, sd, F_PAWNS, -13, -19);
 
         // Relationships
 
@@ -1167,10 +1214,7 @@ void EvalUnstoppablePassers(Position* p, EvalData* e)
     if (p->NonPawnCnt(Black) == 0) {
 
         enemyKing = p->king_sq[Black];
-        if (p->side == Black)
-            tempo = 1;
-        else
-            tempo = 0;
+        tempo = (p->side == Black);
 
         pawns = p->Map(White, Pawn);
         while (pawns) {
@@ -1193,10 +1237,7 @@ void EvalUnstoppablePassers(Position* p, EvalData* e)
     if (p->NonPawnCnt(White) == 0) {
 
         enemyKing = p->king_sq[White];
-        if (p->side == White)
-            tempo = 1;
-        else
-            tempo = 0;
+        tempo = (p->side == White);
 
         pawns = p->Map(Black, Pawn);
         while (pawns) {

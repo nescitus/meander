@@ -1,4 +1,4 @@
-#include "meander.h"
+#include "rodent.h"
 
 int Legal(Position *p, int move) {
 

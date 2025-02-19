@@ -1,7 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include "meander.h"
+#include "rodent.h"
 #include "timer.h"
 #include <iostream>
 
@@ -46,7 +46,7 @@ void UciLoop(void) {
     ReadLine(command, sizeof(command));
     ptr = ParseToken(command, token);
     if (strcmp(token, "uci") == 0) {
-      printf("id name Meander 1.120\n");
+      printf("id name Baby Rodent 1.120\n");
       printf("id author Pawel Koziol (based on Sungorus 1.4 by Pablo Vazquez)\n");
       printf("option name Hash type spin default 16 min 1 max 4096\n");
       printf("option name Clear Hash type button\n");
@@ -61,6 +61,7 @@ void UciLoop(void) {
       printf("option name OwnPawnStruct type spin default %d min 0 max 500\n", options[O_OWN_PAWN]);
       printf("option name OppPawnStruct type spin default %d min 0 max 500\n", options[O_OPP_PAWN]);
 	  //printf("option name PassedPawns type spin default %d min 0 max 500\n", weights[F_PASSERS]);
+	  //printf("option name PawnStructure type spin default %d min 0 max 500\n", weights[F_PAWNS]);
       printf("option name Level type spin default %d min 0 max 1024\n", engineLevel);
       printf("uciok\n");
     }

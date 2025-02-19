@@ -1,4 +1,4 @@
-#include "meander.h"
+#include "rodent.h"
 #include "stdio.h"
 
 int *GenerateCaptures(Position *p, int *list) {

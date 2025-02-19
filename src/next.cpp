@@ -1,4 +1,4 @@
-#include "meander.h"
+#include "rodent.h"
 #include <assert.h>
 
 void Engine::InitMoves(Position *p, MOVES *m, int trans_move, int refutation, int ply) {

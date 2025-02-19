@@ -1,18 +1,12 @@
 #include <stdio.h>
 #include <string.h>
 #include "math.h"
-#include "meander.h"
+#include "rodent.h"
 #include "timer.h"
 
-// conservative null move:
-// 18:08 to move to 1.Qf6 (d 30)
-// 24:40 to good score
-// -24 Elo to version that doesn't solve
-
-// ambitious null move:
-// 22:52 to move to 1.Qf6 (d ??)
-// 40:40 to good score
-// +10? Elo to version that doesn't solve
+const int dummyMove = CreateMove(A1, H7);
+const int singularDepth = 7;
+int excludedMove = dummyMove;
 
 int progSide;
 int captureSquare[MAX_PLY];
@@ -48,7 +42,7 @@ void Engine::SetTimingData(Position* p, int move, int depth, int *pv)
     }
 }
 
-int Engine::Search(Position* p, int ply, int alpha, int beta, int depth, int was_null, int* pv) {
+int Engine::Search(Position* p, int ply, int alpha, int beta, int depth, bool isExcluded, int was_null, int* pv) {
 
     int best, score, move, moveType, newDepth, reduction, hashFlag, hashScore, new_pv[MAX_PLY];
     bool isInCheck, isPrunableNode, isPrunableMove, isPv = (beta > alpha + 1);
@@ -58,10 +52,19 @@ int Engine::Search(Position* p, int ply, int alpha, int beta, int depth, int was
     int moveList[256];
     int histScore;
     int moveSEEscore = 0;
+    int singularMove, singularScore;
+    bool singularExtension, hasTTmove;
 
     MOVES m[1];
     UNDO u[1];
     EvalData e;
+
+    // Init
+
+    singularScore = -INF;
+    singularMove = 0;
+    singularExtension = false;
+    hasTTmove = false;
 
     // Quiescence search entry point
 
@@ -80,12 +83,12 @@ int Engine::Search(Position* p, int ply, int alpha, int beta, int depth, int was
 
     if (ply) {
         *pv = 0;
-    
+
         if (IsDraw(p))
             return 0;
 
         // Mate distance pruning (except at root)
-    
+
         alpha = Max(alpha, -MATE + ply);
         beta = Min(beta, MATE - ply + 1);
         if (alpha > beta) {
@@ -112,6 +115,8 @@ int Engine::Search(Position* p, int ply, int alpha, int beta, int depth, int was
             UpdateHistory(p, oldMove[ply - 1], move, depth, ply);
         }
 
+        if (move) hasTTmove = true;
+
         // In pv nodes only exact scores are returned. This is done because
         // there is much more pruning and reductions in zero-window nodes,
         // so retrieving such scores in pv nodes works like retrieving scores
@@ -123,9 +128,21 @@ int Engine::Search(Position* p, int ply, int alpha, int beta, int depth, int was
 
     // Safeguard against exceeding ply limit
 
-    if (ply >= MAX_PLY - 1) 
+    if (ply >= MAX_PLY - 1)
     {
         return Evaluate(p, &e, 1);
+    }
+
+    // Prepare for singular extension
+
+    if (ply && depth > singularDepth && excludedMove == dummyMove) {
+        if (TransRetrieve(p->hash_key, &singularMove, &singularScore, &hashFlag, alpha, beta, depth - 4, ply)) {
+
+            if ((hashFlag & LOWER) && singularScore < MAX_EVAL)
+            {
+                singularExtension = true;
+            }
+        }
     }
 
     // Are we in check? Knowing that is useful when it comes 
@@ -160,15 +177,15 @@ int Engine::Search(Position* p, int ply, int alpha, int beta, int depth, int was
 
     // Adjust node eval by using transposition table score
 
-    if (isTTread) 
-    {
-        if (hashFlag & (hashScore > eval ? LOWER : UPPER))
-            eval = hashScore;
-    }
+    //if (isTTread)
+    //{
+    //    if (hashFlag & (hashScore > eval ? LOWER : UPPER))
+    //        eval = hashScore;
+   // }
 
     bool improving = true;
 
-    if (ply > 2) { // >= 2 is no better
+    if (ply > 1) {
         if (eval < oldEval[ply - 2])
             improving = false;
     }
@@ -176,11 +193,12 @@ int Engine::Search(Position* p, int ply, int alpha, int beta, int depth, int was
     // Null move (and static null move)
 
     if (isPrunableNode
-    && !was_null
-    && MayNull(p)) {
+        && !was_null
+        && !isExcluded
+        && MayNull(p)) {
 
         if (depth <= 3
-        && abs(beta - 1) > -INF + 100) // TODO: does it work?
+            && abs(beta - 1) > -INF + 100) // TODO: does it work?
         {
             int evalMargin = 120 * depth; // 90 worse, 135 - 30 * improving worse
             if (eval - evalMargin >= beta)
@@ -192,11 +210,11 @@ int Engine::Search(Position* p, int ply, int alpha, int beta, int depth, int was
             reduction = 3 + depth / 6;
             reduction = ((13 + depth) >> 2) + Min(3, (eval - beta) / 185);
 
-            if (HashAllowsNullMove(p->hash_key, alpha, beta, depth - reduction, ply)) 
+            if (HashAllowsNullMove(p->hash_key, alpha, beta, depth - reduction, ply))
             {
                 oldMove[ply] = 0;
                 p->DoNull(u);
-                score = -Search(p, ply + 1, -beta, -beta + 1, depth - reduction, 1, new_pv);
+                score = -Search(p, ply + 1, -beta, -beta + 1, depth - reduction, 1, false, new_pv);
                 p->UndoNull(u);
 
                 // if (score > MAX_EVAL) score = beta;
@@ -205,9 +223,9 @@ int Engine::Search(Position* p, int ply, int alpha, int beta, int depth, int was
                     return 0;
 
                 // null move verification
-                
+
                 if (depth - reduction > 5 && score >= beta)
-                    score = Search(p, ply, alpha, beta, depth - reduction - 4, 1, pv);
+                    score = Search(p, ply, alpha, beta, depth - reduction - 4, false, 1, pv);
 
                 if (abortSearch || abortThread)
                     return 0;
@@ -223,15 +241,16 @@ int Engine::Search(Position* p, int ply, int alpha, int beta, int depth, int was
     // Razoring based on Toga II 3.0
 
     if (isPrunableNode
-    && !move
-    && !was_null
-    && !(p->Map(p->side, Pawn) & bbRelRank[p->side][rank7]) // no pawns to promote in one move
-    && depth <= 3) {
+        && !isExcluded
+        && !move
+        && !was_null
+        && !(p->Map(p->side, Pawn) & bbRelRank[p->side][rank7]) // no pawns to promote in one move
+        && depth <= 3) {
         int threshold = beta - 200 - (depth - 1) * 60;
 
         if (eval < threshold) {
             score = QuiesceChecks(p, ply, alpha, beta, pv);
-            if (score < threshold) 
+            if (score < threshold)
                 return score;
         }
     }   // end of razoring code
@@ -248,14 +267,37 @@ int Engine::Search(Position* p, int ply, int alpha, int beta, int depth, int was
 
     // Main loop
 
-    while ((move = NextMove(m, &moveType))) 
+    while ((move = NextMove(m, &moveType)))
     {
         histScore = GetHistScore(p, move);
         SetCaptureSquare(p, move, ply);
 
-        if (moveType == MV_BADCAPT && depth <= seeDepth) 
+        if (moveType == MV_BADCAPT && depth <= seeDepth)
         {
             moveSEEscore = Swap(p, Fsq(move), Tsq(move));
+        }
+
+        bool extend = false;
+
+        // Singular extension ~4 Elo
+        if (depth > singularDepth &&
+            singularMove &&
+            move == singularMove &&
+            singularExtension &&
+            excludedMove == dummyMove) {
+
+            int mockPv[MAX_PLY];
+            int newAlpha = -singularScore - 50;
+            excludedMove = move;
+            int sc = Search(p, ply + 1, newAlpha, newAlpha + 1, (depth - 1) / 2, false, true, mockPv);
+            excludedMove = dummyMove;
+
+            if (abortSearch)
+                return alpha;
+
+            if (sc <= newAlpha) {
+                extend = true;
+            }
         }
 
         p->DoMove(move, u);
@@ -271,11 +313,11 @@ int Engine::Search(Position* p, int ply, int alpha, int beta, int depth, int was
 
         // Display info currmove in UCI mode
 
-        if (!ply /* && State.isUci*/ && depth > 15) 
+        if (!ply /* && State.isUci*/ && depth > 15)
         {
-                char moveString[6];
-                MoveToStr(move, moveString);
-                printf("info currmove %s currmovenumber %d\n", moveString, movesTried);            
+            char moveString[6];
+            MoveToStr(move, moveString);
+            printf("info currmove %s currmovenumber %d\n", moveString, movesTried);
         }
 
         // Can we prune current move?
@@ -288,7 +330,9 @@ int Engine::Search(Position* p, int ply, int alpha, int beta, int depth, int was
 
         // TODO: if (ply) for all extenstions
 
-        if (InCheck(p) && (isPv || depth < 9))
+        if (extend)
+            newDepth++; // singular extension
+        else if (InCheck(p) && (isPv || depth < 9))
             newDepth++; // check extension
         else if ((depth < 9 && isPv) && Tsq(move) == captureSquare[ply - 1]) // TODO: test || isPv
             newDepth++; // recapture extension
@@ -297,12 +341,12 @@ int Engine::Search(Position* p, int ply, int alpha, int beta, int depth, int was
         //    newDepth++; // history extension
 
         // SEE pruning of bad captures
-        
+
         if (!isInCheck
-        && !InCheck(p)
-        && moveType == MV_BADCAPT
-        && depth <= seeDepth
-        && !isPv) 
+            && !InCheck(p)
+            && moveType == MV_BADCAPT
+            && depth <= seeDepth
+            && !isPv)
         {
             if (moveSEEscore > seeCaptStep * depth) { // yes, sign is correct
                 p->UndoMove(move, u);
@@ -311,17 +355,17 @@ int Engine::Search(Position* p, int ply, int alpha, int beta, int depth, int was
         }
 
         bool isPawnPush = (p->tp_bb[Pawn] & Paint(Tsq(move)))
-                        && (Paint(Tsq(move)) & (RANK_2_BB | RANK_7_BB));
+            && (Paint(Tsq(move)) & (RANK_2_BB | RANK_7_BB));
 
         // Late move pruning
 
         if (isPrunableNode
-        && depth < 10
-        && quietTried > lmpTable[improving][depth]
-        && isPrunableMove
-        && histScore < histLimit
-        && !isPawnPush
-        && MoveType(move) != CASTLE) 
+            && depth < 10
+            && quietTried > lmpTable[improving][depth]
+            && isPrunableMove
+            && histScore < histLimit
+            && !isPawnPush
+            && MoveType(move) != CASTLE)
         {
             p->UndoMove(move, u);
             continue;
@@ -331,13 +375,13 @@ int Engine::Search(Position* p, int ply, int alpha, int beta, int depth, int was
         reduction = 0;
 
         if (depth >= 2
-        && movesTried > 3
-        && !isInCheck
-        && histScore < histLimit
-        && (moveType == MV_NORMAL)
-        && LMR.table[isPv][depth][movesTried] > 0
-        && !isPawnPush
-        && MoveType(move) != CASTLE) 
+            && movesTried > 3
+            && !isInCheck
+            && histScore < histLimit
+            && (moveType == MV_NORMAL)
+            && LMR.table[isPv][depth][movesTried] > 0
+            && !isPawnPush
+            && MoveType(move) != CASTLE)
         {
             reduction = LMR.table[isPv][depth][movesTried];
 
@@ -362,30 +406,30 @@ int Engine::Search(Position* p, int ply, int alpha, int beta, int depth, int was
 
             newDepth -= reduction;
         }
-        
+
         if (!InCheck(p)
-        && moveType == MV_BADCAPT
-        && depth < 8
-        && !isPv
-        && depth >= 2
-        && movesTried > 3
-        && !isInCheck)
+            && moveType == MV_BADCAPT
+            && depth < 8
+            && !isPv
+            && depth >= 2
+            && movesTried > 3
+            && !isInCheck)
         {
             reduction = 1;
             newDepth -= reduction;
         }
-        
+
 
     re_search:
 
         // PVS
 
         if (best == -INF)
-            score = -Search(p, ply + 1, -beta, -alpha, newDepth, 0, new_pv);
+            score = -Search(p, ply + 1, -beta, -alpha, newDepth, false, 0, new_pv);
         else {
-            score = -Search(p, ply + 1, -alpha - 1, -alpha, newDepth, 0, new_pv);
+            score = -Search(p, ply + 1, -alpha - 1, -alpha, newDepth, false, 0, new_pv);
             if (!abortSearch && !abortThread && score > alpha && score < beta)
-                score = -Search(p, ply + 1, -beta, -alpha, newDepth, 0, new_pv);
+                score = -Search(p, ply + 1, -beta, -alpha, newDepth, false, 0, new_pv);
         }
 
         // Reduced move scored above alpha - we need to re-search it

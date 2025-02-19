@@ -1,4 +1,4 @@
-#include "meander.h"
+#include "rodent.h"
 #include <stdio.h>
 #include "pst.h"
 
@@ -27,6 +27,10 @@ void cPst::Init()
             mgQs[sd][Pawn][RelSq(sq, sd)] = p_qs[sq];
             mgKs[sd][Knight][RelSq(sq, sd)] = n_ks[sq];
             mgBackward[sd][RelSq(sq, sd)] = pstBackwardMg[sq];
+            mgPhalanx[sd][RelSq(sq, sd)] = pstPhalanxPawnMg[sq];
+            egPhalanx[sd][RelSq(sq, sd)] = pstPhalanxPawnEg[sq];
+            mgDefended[sd][RelSq(sq, sd)] = pstDefendedPawnMg[sq];
+            egDefended[sd][RelSq(sq, sd)] = pstDefendedPawnEg[sq];
             mgShieldedB[sd][RelSq(sq, sd)] = b_shld_mg[sq];
             mgShieldedN[sd][RelSq(sq, sd)] = n_shld_mg[sq];
             rConMg[sd][RelSq(sq, sd)] = r_con_mg[sq];
@@ -293,7 +297,7 @@ void cPst::Init()
 
         AddPawnRelation(C4, D5, 9, 2);
         AddPawnRelation(E4, D5, 9, 2);
-        AddPawnRelation(C4, E4, 4, 0); // fm
+        AddPawnRelation(C4, E4, 3, 0); // fm
 
         AddPawnRelation(D4, E5,12, 2); // fm
         AddPawnRelation(F4, E5,14, 2);
@@ -373,20 +377,6 @@ void cPst::Init()
         AddPawnRelation(D3, G3,  2, 0);
         AddPawnRelation(E5, H4,  2, 0);
         AddPawnRelation(E5, H5,  6, 0);
-
-        // new
-
-        AddPawnRelation(A2, B4, -1, 0);
-        AddPawnRelation(A2, C5,  1, 0);
-        AddPawnRelation(C2, B4, -1, 0);
-        AddPawnRelation(C2, E3, -4, 0); //fm
-        AddPawnRelation(D2, C4,  1, 0);
-        AddPawnRelation(D2, E4, -2, 0);
-        AddPawnRelation(E2, F4,  1, 0);
-        AddPawnRelation(H2, G4, -4, 0);
-        AddPawnRelation(A4, F4,  1, 0);
-        AddPawnRelation(A4, H4,  0, 1);
-        AddPawnRelation(C4, F4,  1, 0);
     }
 
     /**

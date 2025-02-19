@@ -1,4 +1,4 @@
-#include "meander.h"
+#include "rodent.h"
 #include "stdio.h"
 
 #define USE_MAGIC

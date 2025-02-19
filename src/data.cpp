@@ -1,4 +1,4 @@
-#include "meander.h"
+#include "rodent.h"
 
 int castle_mask[64];
 const int bit_table[64] = {

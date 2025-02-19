@@ -5,7 +5,7 @@
 #  include <unistd.h>
 #  include <sys/time.h>
 #endif
-#include "meander.h"
+#include "rodent.h"
 
 int InputAvailable(void) {
 

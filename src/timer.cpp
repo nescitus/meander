@@ -1,6 +1,6 @@
 #include <stdio.h>
 #include "timer.h"
-#include "meander.h"
+#include "rodent.h"
 
 
 #if defined(_WIN32) || defined(_WIN64)
