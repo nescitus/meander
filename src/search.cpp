@@ -277,9 +277,10 @@ int Engine::Search(Position* p, int ply, int alpha, int beta, int depth, bool is
             moveSEEscore = Swap(p, Fsq(move), Tsq(move));
         }
 
+        // Singular extension
+
         bool extend = false;
 
-        // Singular extension ~4 Elo
         if (depth > singularDepth &&
             singularMove &&
             move == singularMove &&
@@ -383,9 +384,15 @@ int Engine::Search(Position* p, int ply, int alpha, int beta, int depth, bool is
             && !isPawnPush
             && MoveType(move) != CASTLE)
         {
+            // Basic reduction
+
             reduction = LMR.table[isPv][depth][movesTried];
 
+            // Increase on bad history
+
             reduction += (histScore < 200);
+
+            // Increase non-improving non-pv reduction
 
             reduction += (!isPv && !improving);
 
@@ -406,6 +413,8 @@ int Engine::Search(Position* p, int ply, int alpha, int beta, int depth, bool is
 
             newDepth -= reduction;
         }
+
+        // Late move reduction of bad captures
 
         if (!InCheck(p)
             && moveType == MV_BADCAPT
@@ -428,7 +437,7 @@ int Engine::Search(Position* p, int ply, int alpha, int beta, int depth, bool is
             score = -Search(p, ply + 1, -beta, -alpha, newDepth, false, 0, new_pv);
         else {
             score = -Search(p, ply + 1, -alpha - 1, -alpha, newDepth, false, 0, new_pv);
-            if (!abortSearch && !abortThread && score > alpha && score < beta)
+            if (!abortSearch && !abortThread && score > alpha /* && score < beta*/)
                 score = -Search(p, ply + 1, -beta, -alpha, newDepth, false, 0, new_pv);
         }
 
@@ -451,6 +460,8 @@ int Engine::Search(Position* p, int ply, int alpha, int beta, int depth, bool is
             if (ply == 0) {
                 SetTimingData(p, move, depth, pv);
             }
+
+            // Butterfly history update
 
             UpdateHistory(p, oldMove[ply - 1], move, depth, ply);
             for (int i = 0; i < movesTried; i++) {
@@ -505,95 +516,6 @@ int Engine::Search(Position* p, int ply, int alpha, int beta, int depth, bool is
     return best;
 }
 
-bool IsDraw(Position* p) {
-
-    // Draw by 50 move rule
-
-    if (p->rev_moves > 100) {
-        if (Timeout())
-            abortSearch = true;
-        return true;
-    }
-
-    // Draw by repetition
-
-    for (int i = 4; i <= p->rev_moves; i += 2)
-        if (p->hash_key == p->rep_list[p->head - i]) {
-            if (Timeout())
-                abortSearch = true;
-            return true;
-        }
-
-    // Draw by insufficient material (bare kings or Km vs K)
-
-    if (!Illegal(p)) {
-        if (p->cnt[White][Pawn] + p->cnt[Black][Pawn] + p->MajorCnt(White) + p->MajorCnt(Black) == 0) {
-
-            // K(m)K
-            if (p->MinorCnt(White) + p->MinorCnt(Black) <= 1) {
-                if (Timeout())
-                    abortSearch = true;
-                return true;
-            }
-
-            // KmKm but no kings on the rim
-            if (p->MinorCnt(White) == 1 && p->MinorCnt(Black) == 1) {
-                if ((p->tp_bb[King] & Mask.rim) == 0) {
-                    if (Timeout())
-                        abortSearch = true;
-                    return true;
-                }
-            }
-        }
-    }
-
-    // KPK draw
-
-    if (p->AllPawnCnt() == 1 && p->MajorCnt(White) + p->MajorCnt(Black) + p->MinorCnt(White) + p->MinorCnt(Black) == 0) {
-        // TODO: is this loss of time reason?
-        if (p->cnt[White][Pawn] == 1) return KPKdraw(p, White);  // exactly one white pawn
-        if (p->cnt[Black][Pawn] == 1) return KPKdraw(p, Black);  // exactly one black pawn
-    }
-
-    return false; // default: no draw
-}
-
-bool KPKdraw(Position* p, int sd)
-{
-    int op = sd ^ 1;
-    Bitboard bbPawn = p->Map(sd, Pawn);
-    Bitboard bbStrongKing = p->Map(sd, King);
-    Bitboard bbWeakKing = p->Map(op, King);
-
-    // opposition through a pawn
-
-    if (p->side == sd
-        && (bbWeakKing & FwdOf(bbPawn, sd))
-        && (bbStrongKing & FwdOf(bbPawn, op))) {
-        return true;
-    }
-
-    // weaker side can create opposition through a pawn in one move
-
-    if (p->side == op
-        && (Att.King(p->king_sq[op]) & FwdOf(bbPawn, sd))
-        && (bbStrongKing & FwdOf(bbPawn, op))) {
-        if (!Illegal(p)) return true;
-    }
-
-    // opposition next to a pawn
-
-    if (p->side == sd
-        && (bbStrongKing & SidesOf(bbPawn))
-        && (bbWeakKing & FwdOf(FwdOf(bbStrongKing, sd), sd))) {
-        return true;
-    }
-
-    // TODO: pawn checks king
-
-    return false;
-}
-
 void DisplayPv(int score, int* pv, int t) {
 
     char* type, pv_str[512];
@@ -646,26 +568,6 @@ int Timeout() {
     }
 
     return (!pondering && !Timer.IsInfiniteMode() && Timer.TimeHasElapsed());
-}
-
-// check whether our king has at least one legal move
-
-bool IsKingMobile(Position* p) {
-
-    bool isKingMobile = false;
-    int side = p->side;
-    int oppo = ~side;
-    int ksq = p->king_sq[side];
-    int target;
-    Bitboard moves = Att.King(ksq) & p->Empty(); // try !own color
-
-    while (moves) {
-        target = PopFirstBit(&moves);
-        if (!Attacked(p, target, oppo))
-            return true;
-    }
-
-    return false;
 }
 
 void SetCaptureSquare(Position* p, int move, int ply)

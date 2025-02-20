@@ -520,7 +520,6 @@ void Init(void);
 void InitWeights(void);
 void InitOptions(void);
 int InputAvailable(void);
-bool IsKingMobile(Position* p);
 Bitboard InitHashKey(Position * p);
 Bitboard InitPawnKey(Position * p);
 bool KPKdraw(Position* p, int sd);
